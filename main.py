@@ -5,6 +5,7 @@ import torchvision.transforms as transforms
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 from PIL import Image
+import os
 
 # -----------------------
 # Define the same CNN as in training
@@ -20,7 +21,7 @@ class SimpleCNN(nn.Module):
             dummy = torch.zeros(1,1,28,28)
             dummy = torch.relu(self.conv1(dummy))
             dummy = torch.relu(self.conv2(dummy))
-            flattened_size = dummy.numel()  # 64*24*24 = 36864
+            flattened_size = dummy.numel()
 
         self.fc1 = nn.Linear(flattened_size, 128)
         self.fc2 = nn.Linear(128, 10)
@@ -37,7 +38,8 @@ class SimpleCNN(nn.Module):
 # Load model
 # -----------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = torch.jit.load("mnist_cnn.pt", map_location=device)
+model_path = os.getenv("MODEL_PATH", "mnist_cnn.pt")  # optional environment variable
+model = torch.jit.load(model_path, map_location=device)
 model.eval()
 
 # -----------------------
@@ -53,6 +55,16 @@ transform = transforms.Compose([
     transforms.Normalize((0.1307,), (0.3081,))
 ])
 
+# -----------------------
+# Root endpoint
+# -----------------------
+@app.get("/")
+async def root():
+    return {"message": "MNIST Digit Classifier API is running! Visit /docs to test."}
+
+# -----------------------
+# Predict endpoint
+# -----------------------
 @app.post("/predict/")
 async def predict(file: UploadFile = File(...)):
     try:
