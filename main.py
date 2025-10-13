@@ -4,7 +4,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
-from PIL import Image
+from PIL import Image, ImageOps
 import os
 
 # -----------------------
@@ -73,6 +73,16 @@ async def predict(file: UploadFile = File(...)):
         with torch.no_grad():
             output = model(tensor)
             pred = output.argmax(dim=1).item()
+        # Try inversion if confusion (0 or 8)
+        if pred == 0 or pred == 8:
+            inverted = ImageOps.invert(image)
+            tensor_inv = transform(inverted).unsqueeze(0).to(device)
+            with torch.no_grad():
+                output_inv = model(tensor_inv)
+                pred_inv = output_inv.argmax(dim=1).item()
+            # Heuristic: if orig is 0 but inv is not, prefer inv
+            if pred == 0 and pred_inv != 0:
+                return JSONResponse({"prediction": pred_inv, "note": "Inversion helped, original prediction was 0"})
         return JSONResponse({"prediction": pred})
     except Exception as e:
         return JSONResponse({"error": str(e)})

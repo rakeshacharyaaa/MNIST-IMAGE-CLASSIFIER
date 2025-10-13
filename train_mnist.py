@@ -43,6 +43,9 @@ transform = transforms.Compose([
 train_dataset = datasets.MNIST(root='data', train=True, download=True, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 
+test_dataset = datasets.MNIST(root='data', train=False, download=True, transform=transform)
+test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
+
 # -----------------------
 # Train Model
 # -----------------------
@@ -51,9 +54,10 @@ model = SimpleCNN().to(device)
 optimizer = optim.Adam(model.parameters())
 criterion = nn.CrossEntropyLoss()
 
-epochs = 1  # change to more epochs for better accuracy
+epochs = 10  # increase epochs for better accuracy
 for epoch in range(epochs):
     print(f"Epoch {epoch+1}/{epochs}")
+    model.train()
     for batch_idx, (X, y) in enumerate(train_loader):
         X, y = X.to(device), y.to(device)
         optimizer.zero_grad()
@@ -63,6 +67,19 @@ for epoch in range(epochs):
         optimizer.step()
         if batch_idx % 100 == 0:
             print(f"Batch {batch_idx}/{len(train_loader)} - Loss: {loss.item():.4f}")
+    # Validation accuracy after each epoch
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for X, y in test_loader:
+            X, y = X.to(device), y.to(device)
+            out = model(X)
+            pred = out.argmax(dim=1)
+            correct += (pred == y).sum().item()
+            total += y.size(0)
+    acc = 100. * correct / total
+    print(f"Validation Accuracy after epoch {epoch+1}: {acc:.2f}%")
 
 # Save the trained model
 torch.jit.script(model).save("mnist_cnn.pt")
